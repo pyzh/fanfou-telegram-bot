@@ -1,0 +1,5 @@
+runtime: go
+env: flex
+env_variables:
+  ConsumerKey: ""
+  ConsumerSecret: ""
