@@ -124,8 +124,8 @@ func ParseAuthorizationCallback(req *http.Request) (requestToken, verifier strin
 	}
 	requestToken = req.Form.Get(oauthTokenParam)
 	verifier = req.Form.Get(oauthVerifierParam)
-	if requestToken == "" || verifier == "" {
-		return "", "", errors.New("oauth1: Request missing oauth_token or oauth_verifier")
+	if requestToken == "" {
+		return "", "", errors.New("oauth1: Request missing oauth_token")
 	}
 	return requestToken, verifier, nil
 }
