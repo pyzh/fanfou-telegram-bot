@@ -27,6 +27,9 @@ type Config struct {
 	Endpoint Endpoint
 	// OAuth1 Signer (defaults to HMAC-SHA1)
 	Signer Signer
+
+	// Disable endpoint callback url validation check
+	DisableCallbackConfirm bool
 }
 
 // NewConfig returns a new Config with the given consumer key and secret.
@@ -82,7 +85,7 @@ func (c *Config) RequestToken() (requestToken, requestSecret string, err error) 
 	if err != nil {
 		return "", "", err
 	}
-	if values.Get(oauthCallbackConfirmedParam) != "true" {
+	if !c.DisableCallbackConfirm && values.Get(oauthCallbackConfirmedParam) != "true" {
 		return "", "", errors.New("oauth1: oauth_callback_confirmed was not true")
 	}
 	requestToken = values.Get(oauthTokenParam)
