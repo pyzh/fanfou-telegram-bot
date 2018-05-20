@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/dghubble/oauth1"
+  packages = ["."]
+  revision = "70562a5920ad9b6ff03ef697c0f90ae569abbd2b"
+  version = "v0.4.0"
+
+[[projects]]
   name = "github.com/go-chi/chi"
   packages = [
     ".",
@@ -10,9 +16,15 @@
   revision = "e83ac2304db3c50cf03d96a2fcd39009d458bc35"
   version = "v3.3.2"
 
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "57065200b4b034a1c8ad54ff77069408c2218ae6"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "306b90a81d776dadb60b876ecd62e0257a93a0e2262e641dd0f8e75de09a0fd9"
+  inputs-digest = "1779f81bf6148f34880cf4f8057ae7643a61c2ecc8a2835464fcf9f853e9373e"
   solver-name = "gps-cdcl"
   solver-version = 1
