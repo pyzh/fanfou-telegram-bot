@@ -9,21 +9,22 @@ import (
 	"strconv"
 	"time"
 
+	"cloud.google.com/go/datastore"
 	"github.com/dghubble/oauth1"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 var oauthConfig = oauth1.Config{
 	ConsumerKey:            os.Getenv("ConsumerKey"),
 	ConsumerSecret:         os.Getenv("ConsumerSecret"),
-	CallbackURL:            "https://fanfou-204619.appspot.com/callback",
+	CallbackURL:            "https://fanfou-204818.appspot.com/callback",
 	Endpoint:               FanfouEndpoint,
 	DisableCallbackConfirm: true,
 }
+
+var datastoreClient *datastore.Client
 
 type oauthInfo struct {
 	Token  string
@@ -51,7 +52,18 @@ func main() {
 		}
 	})
 
+	bot.Handle(tb.OnText, func(m *tb.Message) {
+		log.Println(m.Text)
+	})
+
 	go bot.Start()
+
+	ctx := context.Background()
+	projectID := os.Getenv("ProjectID")
+	datastoreClient, err = datastore.NewClient(ctx, projectID)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -85,10 +97,11 @@ func main() {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		ctx := appengine.NewContext(r)
-		key := getKey(ctx, int64(telegramID))
-		e := &oauthInfo{Token: accessToken, Secret: accessSecret}
-		if err := datastore.Get(ctx, key, e); err != nil {
+
+		ctx := context.Background()
+		k := datastore.IDKey("tokens", int64(telegramID), nil)
+		v := &oauthInfo{Token: accessToken, Secret: accessSecret}
+		if _, err := datastoreClient.Put(ctx, k, v); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
@@ -118,8 +131,4 @@ func getAuthorizationURL(telegramID int) (url string, err error) {
 		return
 	}
 	return authorizationURL.String(), nil
-}
-
-func getKey(ctx context.Context, ID int64) *datastore.Key {
-	return datastore.NewKey(ctx, "tokens", "", ID, nil)
 }
