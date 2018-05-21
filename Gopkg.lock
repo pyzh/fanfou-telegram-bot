@@ -17,14 +17,26 @@
   version = "v3.3.2"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
   revision = "57065200b4b034a1c8ad54ff77069408c2218ae6"
 
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/tucnak/telebot.v2"
+  packages = ["."]
+  revision = "ab26c41a13a14d620877bc21f61152d3a17493e9"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1779f81bf6148f34880cf4f8057ae7643a61c2ecc8a2835464fcf9f853e9373e"
+  inputs-digest = "fa11c650ad771df16cf0002c40ec1772901059bd5755a3d3305583a1e7ef66d3"
   solver-name = "gps-cdcl"
   solver-version = 1
