@@ -1,12 +1,16 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/dghubble/oauth1"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 var oauthConfig = oauth1.Config{
@@ -17,7 +21,49 @@ var oauthConfig = oauth1.Config{
 	DisableCallbackConfirm: true,
 }
 
+func getAuthorizationURL(telegramID int) (url string, err error) {
+	requestToken, requestSecret, err := oauthConfig.RequestToken()
+	if err != nil {
+		return
+	}
+	authorizationURL, err := oauthConfig.AuthorizationURL(requestToken)
+	if err != nil {
+		return
+	}
+	q := authorizationURL.Query()
+	callback := fmt.Sprintf("%s?telegram_id=%d&request_secret=%s", oauthConfig.CallbackURL, telegramID, requestSecret)
+	q.Set("oauth_callback", callback)
+	authorizationURL.RawQuery = q.Encode()
+
+	if err != nil {
+		return
+	}
+	return authorizationURL.String(), nil
+}
+
 func main() {
+	bot, err := tb.NewBot(tb.Settings{
+		Token:  os.Getenv("TelegramToken"),
+		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+	})
+
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	bot.Handle("/start", func(m *tb.Message) {
+		authorizationURL, err := getAuthorizationURL(m.Sender.ID)
+		if err != nil {
+			bot.Send(m.Sender, err.Error())
+		} else {
+			text := fmt.Sprintf("**Authorization url** [click link](%s)", authorizationURL)
+			bot.Send(m.Sender, text, tb.ModeMarkdown)
+		}
+	})
+
+	go bot.Start()
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -44,27 +90,6 @@ func main() {
 			return
 		}
 		w.Write([]byte(accessToken + accessSecret))
-	})
-
-	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
-		requestToken, requestSecret, err := oauthConfig.RequestToken()
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-		// get authorization url
-		authorizationURL, err := oauthConfig.AuthorizationURL(requestToken)
-		q := authorizationURL.Query()
-		telegramid := "1"
-		callback := oauthConfig.CallbackURL + "?telegram_id=" + telegramid + "&request_secret=" + requestSecret //TODO
-		q.Set("oauth_callback", callback)
-		authorizationURL.RawQuery = q.Encode()
-
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-		http.Redirect(w, r, authorizationURL.String(), http.StatusFound)
 	})
 
 	http.ListenAndServe(":8080", r)
