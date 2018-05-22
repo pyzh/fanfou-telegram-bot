@@ -99,7 +99,7 @@ func main() {
 		}
 
 		ctx := context.Background()
-		k := datastore.IDKey("tokens", int64(telegramID), nil)
+		k := getKey(telegramID)
 		v := &oauthInfo{Token: accessToken, Secret: accessSecret}
 		if _, err := datastoreClient.Put(ctx, k, v); err != nil {
 			http.Error(w, err.Error(), 500)
@@ -131,4 +131,9 @@ func getAuthorizationURL(telegramID int) (url string, err error) {
 		return
 	}
 	return authorizationURL.String(), nil
+}
+
+func getKey(telegramID int) *datastore.Key {
+	return datastore.IDKey("fanfou_tokens", int64(telegramID), nil)
+
 }
