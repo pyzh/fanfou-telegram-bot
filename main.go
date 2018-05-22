@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -78,7 +80,7 @@ func main() {
 		info := &oauthInfo{}
 		err := datastoreClient.Get(ctx, k, info)
 		if err != nil {
-			bot.Send(m.Sender, err.Error())
+			log.Println("get key error ", err)
 			return
 		}
 		token := oauth1.NewToken(info.Token, info.Secret)
@@ -87,7 +89,7 @@ func main() {
 		data.Set("status", m.Text)
 		resp, err := httpClient.Post("http://api.fanfou.com/statuses/update.json", "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 		if err != nil {
-			bot.Send(m.Sender, err.Error())
+			log.Println("call statuses update error ", err)
 			return
 		}
 		defer resp.Body.Close()
@@ -95,7 +97,7 @@ func main() {
 		if resp.StatusCode != 200 {
 			respErr := responseError{}
 			if err = json.Unmarshal(body, &respErr); err != nil {
-				log.Println("Unmarshal error", err)
+				log.Println("Unmarshal error ", err)
 				return
 			}
 			bot.Send(m.Sender, respErr.Error)
@@ -104,8 +106,79 @@ func main() {
 		response := updateResponse{}
 		if err = json.Unmarshal(body, &response); err != nil {
 			log.Println("Unmarshal error", err)
+			return
 		}
 		bot.Send(m.Sender, "https://fanfou.com/statuses/"+response.ID)
+	})
+
+	// https://api.fanfou.com/photos/upload.json
+	bot.Handle(tb.OnPhoto, func(m *tb.Message) {
+		log.Println("handle photo")
+		caption := "Just posted a photo"
+		if m.Caption != "" {
+			caption = m.Caption
+		}
+		f, err := bot.FileByID(m.Photo.FileID)
+		if err != nil {
+			log.Println("get file error: ", err)
+			return
+		}
+		url := "https://api.telegram.org/file/bot" + bot.Token + "/" + f.FilePath
+		telegramResp, err := http.Get(url)
+		if err != nil {
+			log.Println("get file error ", err)
+			return
+		}
+		defer telegramResp.Body.Close()
+		fileContents, err := ioutil.ReadAll(telegramResp.Body)
+		if err != nil {
+			log.Println("read file error ", err)
+			return
+		}
+
+		bodyBuf := new(bytes.Buffer)
+		w := multipart.NewWriter(bodyBuf)
+		status, err := w.CreateFormField("status")
+		if err != nil {
+			log.Println("status field error ", err)
+			return
+		}
+		// Write status field
+		status.Write([]byte(caption))
+
+		photo, err := w.CreateFormFile("photo", f.FilePath)
+		if err != nil {
+			log.Println("photo field error ", err)
+			return
+		}
+		photo.Write(fileContents)
+
+		w.Close()
+
+		info := &oauthInfo{}
+		if err = datastoreClient.Get(ctx, getKey(m.Sender.ID), info); err != nil {
+			log.Println("get key error ", err)
+			return
+		}
+		token := oauth1.NewToken(info.Token, info.Secret)
+		httpClient := oauthConfig.Client(oauth1.NoContext, token)
+		respFanfou, err := httpClient.Post("http://api.fanfou.com/photos/upload.json", w.FormDataContentType(), bodyBuf)
+		if err != nil {
+			log.Println("send photo error ", err)
+			return
+		}
+		defer respFanfou.Body.Close()
+		body, _ := ioutil.ReadAll(respFanfou.Body)
+		if respFanfou.StatusCode != 200 {
+			respErr := responseError{}
+			if err = json.Unmarshal(body, &respErr); err != nil {
+				log.Println("Unmarshal error ", err)
+				return
+			}
+			log.Println("call fanfou api error ", respErr.Error)
+			return
+		}
+		bot.Send(m.Sender, string(body))
 	})
 
 	go bot.Start()
@@ -155,7 +228,7 @@ func main() {
 		w.Write([]byte("it's ok"))
 	})
 
-	http.ListenAndServe(":8080", r)
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 func getAuthorizationURL(telegramID int) (url string, err error) {
