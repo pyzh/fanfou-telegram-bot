@@ -178,7 +178,12 @@ func main() {
 			log.Println("call fanfou api error ", respErr.Error)
 			return
 		}
-		bot.Send(m.Sender, string(body))
+		response := updateResponse{}
+		if err = json.Unmarshal(body, &response); err != nil {
+			log.Println("Unmarshal error", err)
+			return
+		}
+		bot.Send(m.Sender, "https://fanfou.com/statuses/"+response.ID)
 	})
 
 	go bot.Start()
