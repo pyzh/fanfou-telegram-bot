@@ -100,6 +100,7 @@ func main() {
 				log.Println("Unmarshal error ", err)
 				return
 			}
+			log.Println("call fanfou statuses api error ", respErr.Error)
 			bot.Send(m.Sender, respErr.Error)
 			return
 		}
@@ -175,7 +176,8 @@ func main() {
 				log.Println("Unmarshal error ", err)
 				return
 			}
-			log.Println("call fanfou api error ", respErr.Error)
+			log.Println("call fanfou photos api error ", respErr.Error)
+			bot.Send(m.Sender, respErr.Error)
 			return
 		}
 		response := updateResponse{}
