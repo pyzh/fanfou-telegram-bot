@@ -1,15 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/datastore"
@@ -39,8 +40,8 @@ type responseError struct {
 	Error   string `json:"error"`
 }
 
-type fanFouStatus struct {
-	Status string `json:"status"`
+type updateResponse struct {
+	ID string `json:"id"`
 }
 
 func main() {
@@ -82,16 +83,10 @@ func main() {
 		}
 		token := oauth1.NewToken(info.Token, info.Secret)
 		httpClient := oauthConfig.Client(oauth1.NoContext, token)
-		status := &fanFouStatus{Status: m.Text}
-		reqBody, err := json.Marshal(status)
+		data := url.Values{}
+		data.Set("status", m.Text)
+		resp, err := httpClient.Post("http://api.fanfou.com/statuses/update.json", "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 		if err != nil {
-			log.Println("Marshal error", err)
-			return
-		}
-		log.Println(string(reqBody))
-		resp, err := httpClient.Post("http://api.fanfou.com/statuses/update.json", "application/json", bytes.NewReader(reqBody))
-		if err != nil {
-			log.Println(err)
 			bot.Send(m.Sender, err.Error())
 			return
 		}
@@ -100,14 +95,17 @@ func main() {
 		if resp.StatusCode != 200 {
 			respErr := responseError{}
 			if err = json.Unmarshal(body, &respErr); err != nil {
-				log.Println("Unmarshal error", err, " code", resp.StatusCode)
+				log.Println("Unmarshal error", err)
 				return
 			}
 			bot.Send(m.Sender, respErr.Error)
 			return
 		}
-
-		bot.Send(m.Sender, string(body))
+		response := updateResponse{}
+		if err = json.Unmarshal(body, &response); err != nil {
+			log.Println("Unmarshal error", err)
+		}
+		bot.Send(m.Sender, "https://fanfou.com/statuses/"+response.ID)
 	})
 
 	go bot.Start()
