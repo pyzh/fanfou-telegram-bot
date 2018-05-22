@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -31,7 +34,23 @@ type oauthInfo struct {
 	Secret string
 }
 
+type responseError struct {
+	Request string `json:"request"`
+	Error   string `json:"error"`
+}
+
+type fanFouStatus struct {
+	Status string `json:"status"`
+}
+
 func main() {
+	ctx := context.Background()
+	projectID := os.Getenv("ProjectID")
+	datastoreClient, err := datastore.NewClient(ctx, projectID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	bot, err := tb.NewBot(tb.Settings{
 		Token:  os.Getenv("TelegramToken"),
 		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
@@ -43,6 +62,7 @@ func main() {
 	}
 
 	bot.Handle("/start", func(m *tb.Message) {
+		log.Println("handle /start")
 		authorizationURL, err := getAuthorizationURL(m.Sender.ID)
 		if err != nil {
 			bot.Send(m.Sender, err.Error())
@@ -53,17 +73,44 @@ func main() {
 	})
 
 	bot.Handle(tb.OnText, func(m *tb.Message) {
-		log.Println(m.Text)
+		k := getKey(m.Sender.ID)
+		info := &oauthInfo{}
+		err := datastoreClient.Get(ctx, k, info)
+		if err != nil {
+			bot.Send(m.Sender, err.Error())
+			return
+		}
+		token := oauth1.NewToken(info.Token, info.Secret)
+		httpClient := oauthConfig.Client(oauth1.NoContext, token)
+		status := &fanFouStatus{Status: m.Text}
+		reqBody, err := json.Marshal(status)
+		if err != nil {
+			log.Println("Marshal error", err)
+			return
+		}
+		log.Println(string(reqBody))
+		resp, err := httpClient.Post("http://api.fanfou.com/statuses/update.json", "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			log.Println(err)
+			bot.Send(m.Sender, err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+		if resp.StatusCode != 200 {
+			respErr := responseError{}
+			if err = json.Unmarshal(body, &respErr); err != nil {
+				log.Println("Unmarshal error", err, " code", resp.StatusCode)
+				return
+			}
+			bot.Send(m.Sender, respErr.Error)
+			return
+		}
+
+		bot.Send(m.Sender, string(body))
 	})
 
 	go bot.Start()
-
-	ctx := context.Background()
-	projectID := os.Getenv("ProjectID")
-	datastoreClient, err = datastore.NewClient(ctx, projectID)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
